@@ -4,7 +4,7 @@ import csv
 import os
 import math
 import time
-
+from utils import *
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
@@ -26,62 +26,6 @@ def ensure_csv(path, headers):
         with open(path, "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerow(headers)
 
-def dist2d(a, b):
-    return math.hypot(a[0]-b[0], a[1]-b[1])
-
-def angle_between(v1, v2):
-    dot = v1[0]*v2[0] + v1[1]*v2[1]
-    n1 = math.hypot(v1[0], v1[1])
-    n2 = math.hypot(v2[0], v2[1])
-    if n1 == 0 or n2 == 0:
-        return 0.0
-    c = max(-1.0, min(1.0, dot/(n1*n2)))
-    return math.degrees(math.acos(c))
-
-def curl_angle(lm, mcp, pip, tip):
-    # góc giữa (MCP->PIP) và (PIP->TIP) trên mặt phẳng ảnh
-    v1 = (lm[pip].x - lm[mcp].x, lm[pip].y - lm[mcp].y)
-    v2 = (lm[tip].x - lm[pip].x, lm[tip].y - lm[pip].y)
-    return angle_between(v1, v2)
-
-def extract_features(lm, handed_label):
-    """
-    Trả về 20 feature theo thứ tự:
-    10 tọa độ tips (x4,y4, x8,y8, x12,y12, x16,y16, x20,y20),
-    5 khoảng cách (4-8, 8-12, 12-16, 16-20, 4-20),
-    5 curl (thumb/index/middle/ring/pinky).
-    Normalize: dịch về WRIST(0), scale theo 0->9, mirror tay trái.
-    """
-    wrist = (lm[0].x, lm[0].y)
-    middle_mcp = (lm[9].x, lm[9].y)
-    scale = dist2d(wrist, middle_mcp) or 1.0
-
-    pts = []
-    for i in range(21):
-        x = (lm[i].x - wrist[0]) / scale
-        y = (lm[i].y - wrist[1]) / scale
-        if handed_label == "Left":
-            x = -x  # mirror tay trái
-        pts.append((x, y))
-
-    # 1) tips (x,y)
-    feat = []
-    tip_ids = [4, 8, 12, 16, 20]
-    for tid in tip_ids:
-        feat.extend([pts[tid][0], pts[tid][1]])
-
-    # 2) distances giữa tips
-    for a, b in [(4,8), (8,12), (12,16), (16,20), (4,20)]:
-        feat.append(dist2d(pts[a], pts[b]))
-
-    # 3) curl angles (dùng lm gốc để đo khớp)
-    feat.append(curl_angle(lm, 2, 3, 4))      # thumb
-    feat.append(curl_angle(lm, 5, 6, 8))      # index
-    feat.append(curl_angle(lm, 9,10,12))      # middle
-    feat.append(curl_angle(lm,13,14,16))      # ring
-    feat.append(curl_angle(lm,17,18,20))      # pinky)
-
-    return feat
 
 # ------------------------ MAIN ------------------------
 ensure_csv(CSV_PATH, HEADERS)
